@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entry Exit Request Sender</title>
+</head>
+<body>
+
+  <h2>Send Entry & Exit Data</h2>
+
+  <form id="dataForm">
+
+    <!-- Digital ID -->
+    <label>Digital ID:</label><br>
+    <input type="text" id="digitalId" required><br><br>
+    
+    <label>Purpose:</label><br>
+    <input type="text" id="purpaose" required><br><br>
+    
+    <label>Place:</label><br>
+    <input type="text" id="place" required><br><br>
+
+    <!-- Pass Type Dropdown -->
+    <label>Select Pass Type:</label><br>
+    <select id="passType" required>
+      <option value="">-- Choose Pass Type --</option>
+      <option value="weekendPass">Weekend Pass</option>
+      <option value="eveningOutPass">Evening Out Pass</option>
+      <option value="workingDayPass">Working Day Pass</option>
+      <option value="holidayPass">Holiday Pass</option>
+    </select><br><br>
+
+    <!-- Entry DateTime -->
+    <label>Entry Date & Time:</label><br>
+    <input type="datetime-local" id="entryDateTime" required><br><br>
+
+    <!-- Exit DateTime -->
+    <label>Exit Date & Time:</label><br>
+    <input type="datetime-local" id="exitDateTime" required><br><br>
+
+    <!-- Buttons -->
+    <button type="button" onclick="sendPostRequest()">Send POST</button>
+
+  </form>
+
+  <p id="responseBox"></p>
+
+  <script>
+    const apiUrl = "https://hostelgatepass.ssn.edu.in/v1/databases/ssndb/collections/gatepassRequests/documents"; 
+    // Replace with your actual endpoint
+    
+    function calculateDays(entryValue, exitValue) {
+      const entryDate = new Date(entryValue);
+      const exitDate = new Date(exitValue);
+    
+        // Remove time part (only keep date)
+        const entryOnlyDate = new Date(
+          entryDate.getFullYear(),
+          entryDate.getMonth(),
+          entryDate.getDate()
+        );
+    
+        const exitOnlyDate = new Date(
+          exitDate.getFullYear(),
+          exitDate.getMonth(),
+          exitDate.getDate()
+        );
+    
+        // Difference in milliseconds
+        const diffTime = exitOnlyDate - entryOnlyDate;
+    
+        // Convert ms ? days
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    
+        // Inclusive count (+1)
+        return diffDays + 1;
+    }
+    
+    function convertToISO(dateTimeValue) {
+      return new Date(dateTimeValue).toISOString();
+    }
+    
+    // Function to collect form payload
+    function getPayload() {
+      const entryValue = document.getElementById("entryDateTime").value;
+      const exitValue = document.getElementById("exitDateTime").value;
+      const passType = document.getElementById("passType").value;
+      var mentor = "exempted";
+      if(passType == "workingDayPass"){
+        mentor = "approved"
+      }
+      return {
+          "documentId": "unique()",
+          "data": {
+              "requestType": passType,
+              "place": document.getElementById("place").value,
+              "startDate": convertToISO(entryValue),
+              "endDate": convertToISO(exitValue),
+              "purpose": document.getElementById("purpaose").value,
+              "students": document.getElementById("digitalId").value,
+              "status": "approved",
+              "wardenApproval": "approved",
+              "numberOfDays": calculateDays(entryValue, exitValue),
+              "mentorApproval": mentor,
+              "supervisorApproval": "approved"
+          }
+      };
+    }
+
+    // POST Request
+    async function sendPostRequest() {
+      const payload = getPayload();
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-appwrite-project": "ssn-gatepass-1"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const statusCode = response.status;
+        const statusText = response.statusText;
+
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          result = await response.text();
+        }
+
+        document.getElementById("responseBox").innerText =
+          `POST Status: ${statusCode} ${statusText}\n\nResponse:\n${result}`;
+
+      } catch (error) {
+        console.log("POST Error:", error);
+      }
+    }
+
+    // PATCH Request
+    async function sendPatchRequest() {
+      const payload = getPayload();
+
+      try {
+        const response = await fetch(apiUrl + "/123", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer YOUR_TOKEN_HERE",
+            "X-Custom-Header": "CustomValue"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const statusCode = response.status;
+      const statusText = response.statusText;
+
+      // Convert response to JSON
+      const result = await response.json();
+
+      document.getElementById("responseBox").innerText =
+        `POST Status: ${statusCode} ${statusText}\n\nResponse Body:\n` +
+        JSON.stringify(result, null, 2);
+
+      } catch (error) {
+        alert("PATCH Error:", error);
+      }
+    }
+  </script>
+
+</body>
+</html>
